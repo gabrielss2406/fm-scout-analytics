@@ -1,6 +1,5 @@
-# Multi-stage build for FM Moneyball Scout
-# Stage 1: Build the application
-FROM node:18-alpine AS builder
+# FM Moneyball Scout - Simplified Docker build
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
@@ -9,22 +8,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY . .
 
 # Build the application
 RUN npm run build
-
-# Stage 2: Production server
-FROM nginx:alpine AS production
-
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Copy built application from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Add labels for better container management
 LABEL maintainer="FM Moneyball Scout"
@@ -33,23 +23,20 @@ LABEL version="1.0.0"
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001
+  adduser -S nextjs -u 1001
 
-# Set proper permissions
-RUN chown -R nextjs:nodejs /usr/share/nginx/html && \
-    chown -R nextjs:nodejs /var/cache/nginx && \
-    chown -R nextjs:nodejs /var/log/nginx && \
-    chown -R nextjs:nodejs /etc/nginx/conf.d
+# Change ownership of the app directory
+RUN chown -R nextjs:nodejs /app
 
 # Switch to non-root user
 USER nextjs
 
 # Expose port
-EXPOSE 80
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
+  CMD curl -f http://localhost:3000 || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start the application
+CMD ["npm", "start"]
