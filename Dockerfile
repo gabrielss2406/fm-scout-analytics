@@ -1,42 +1,24 @@
-# FM Moneyball Scout - Simplified Docker build
-FROM node:18-alpine
+# Etapa 1 - build
+FROM node:20-alpine AS build
 
-# Set working directory
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
-RUN npm ci && npm cache clean --force
-
-# Copy source code
+RUN npm ci
 COPY . .
-
-# Build the application
 RUN npm run build
 
-# Add labels for better container management
-LABEL maintainer="FM Moneyball Scout"
-LABEL description="Professional Football Manager player analysis tool"
-LABEL version="1.0.0"
+# Etapa 2 - servidor para os arquivos estáticos
+FROM node:20-alpine AS prod
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-  adduser -S nextjs -u 1001
+WORKDIR /app
+# instalar o "serve" para servir a pasta dist
+RUN npm install -g serve
 
-# Change ownership of the app directory
-RUN chown -R nextjs:nodejs /app
+# copiar a pasta dist do build
+COPY --from=build /app/dist ./dist
 
-# Switch to non-root user
-USER nextjs
-
-# Expose port
+# expor a porta
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000 || exit 1
-
-# Start the application
-CMD ["npm", "start"]
+# rodar o servidor estático
+CMD ["serve", "-s", "dist", "-l", "3000"]
